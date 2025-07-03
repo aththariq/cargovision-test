@@ -1,19 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Zap, Play } from "lucide-react";
 import { gsap } from "gsap";
 import { TextPlugin } from "gsap/TextPlugin";
 
 export default function HeroSection() {
-  const [email, setEmail] = useState("");
-
-  // Words to cycle through in the typewriter effect
-  const words = ["accurate", "secure", "instant", "compliant", "reliable"];
-
   // Ref for the dynamic word span
   const wordRef = useRef<HTMLSpanElement>(null);
   const cursorRef = useRef<HTMLSpanElement>(null);
@@ -23,6 +17,9 @@ export default function HeroSection() {
     if (!wordRef.current || !cursorRef.current) return;
 
     gsap.registerPlugin(TextPlugin);
+
+    // Words to cycle through in the typewriter effect
+    const words = ["accurate", "secure", "instant", "compliant", "reliable"];
 
     // Cursor blinking animation
     gsap.to(cursorRef.current, {
@@ -65,12 +62,9 @@ export default function HeroSection() {
     return () => {
       tl.kill();
     };
-  }, [words]);
+  }, []);
 
-  const handleGetStarted = () => {
-    // Handle get started action
-    console.log("Getting started with email:", email);
-  };
+
 
   // Easily adjust horizontal gap for hero container
   const SIDE_GAP = "1rem"; // tweak this value to increase/decrease side spacing
@@ -115,7 +109,7 @@ export default function HeroSection() {
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
               <div>AI-powered cargo</div>
               <div className="flex items-center justify-center flex-wrap">
-                inspection that's {" "}
+                inspection that&apos;s {" "}
                 <span className="inline-flex items-center ml-2 min-w-[200px] md:min-w-[300px] lg:min-w-[400px]">
                   <span
                     ref={wordRef}

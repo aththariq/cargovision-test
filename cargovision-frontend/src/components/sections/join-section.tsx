@@ -13,7 +13,7 @@ export default function JoinSection() {
               Join 100+ companies already improving with <span className="bg-gradient-to-r text-blue-600 bg-clip-text inline">Cargovision</span>
             </h2>
             <p className="text-base md:text-lg text-gray-600 max-w-prose">
-              We built the complete cargo inspection platform, so you don't have to worry.
+              We built the complete cargo inspection platform, so you don&apos;t have to worry.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mt-2">
               <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-md px-6 py-2">

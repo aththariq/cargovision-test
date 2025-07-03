@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Menu, X, ChevronDown } from "lucide-react";
+import type { NavigationItem } from "@/types";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -39,7 +39,7 @@ export default function Header() {
     };
   }, []);
 
-  const navigationItems = [
+  const navigationItems: NavigationItem[] = [
     { name: "Home", href: "/" },
     { name: "Milestones", href: "/milestones" },
     { name: "About", href: "/about" },
