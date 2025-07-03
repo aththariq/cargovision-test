@@ -12,6 +12,8 @@
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-slot": "^1.2.3",
     "@remixicon/react": "^4.6.0",
+    "@stagewise-plugins/react": "^0.4.9",
+    "@stagewise/toolbar-next": "^0.4.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "gsap": "^3.13.0",
