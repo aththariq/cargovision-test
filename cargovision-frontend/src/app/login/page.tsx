@@ -1,6 +1,12 @@
 "use client";
 
-import { useState } from "react";
+/*
+ * WARNING: This component stores passwords in localStorage when "Remember me" is checked.
+ * This is a SECURITY RISK and should not be used in production.
+ * Consider using secure session tokens or browser password managers instead.
+ */
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,6 +24,29 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const router = useRouter();
+  const { signIn } = useAuth();
+
+  // Pre-populate email & remember flag if it was stored previously (see useEffect below)
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Load remembered credentials if present
+      const savedEmail = localStorage.getItem("loginEmail");
+      const savedPassword = localStorage.getItem("loginPassword"); // WARNING: Security risk!
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setRememberMe(true);
+      }
+      if (savedPassword) {
+        setPassword(savedPassword); // WARNING: Security risk!
+      }
+      const token = localStorage.getItem("token");
+      if (token) {
+        router.replace("/dashboard");
+      }
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,12 +67,19 @@ export default function LoginPage() {
       }
 
       const data = await res.json();
-      // Assuming backend returns token
+      // Persist token via context helper (handles cookie & localStorage)
+      signIn(data.token || "", rememberMe);
+
+      // Store or clear remembered credentials based on the checkbox
       if (rememberMe) {
-        localStorage.setItem("token", data.token || "");
+        localStorage.setItem("loginEmail", email);
+        localStorage.setItem("loginPassword", password); // WARNING: Security risk!
+      } else {
+        localStorage.removeItem("loginEmail");
+        localStorage.removeItem("loginPassword");
       }
       // redirect or further logic
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
