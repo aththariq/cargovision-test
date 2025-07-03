@@ -4,7 +4,6 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnomalyDetection } from "./anomaly-overlay";
 import { AlertTriangle, Eye, EyeOff, MapPin, TrendingUp } from "lucide-react";
 
@@ -51,125 +50,110 @@ export default function DetectionResultsPanel({
     return "secondary";
   };
 
-
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "analyzing": return "bg-yellow-50 text-yellow-800 ring-yellow-600/20";
-      case "completed": return "bg-green-50 text-green-800 ring-green-600/20";
-      case "failed": return "bg-red-50 text-red-800 ring-red-600/20";
-      case "flagged": return "bg-red-50 text-red-800 ring-red-600/20";
-      default: return "bg-gray-50 text-gray-800 ring-gray-600/20";
+      case "analyzing": return "bg-yellow-500";
+      case "completed": return "bg-green-500";
+      case "failed": return "bg-red-500";
+      case "flagged": return "bg-red-500";
+      default: return "bg-gray-500";
     }
   };
 
   return (
-    <div className="h-full flex flex-col space-y-4">
+    <div className="p-6 h-full overflow-y-auto">
       {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Detection Results</h3>
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Analysis Summary</h3>
+        
+        {/* Statistics Grid */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="text-center p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center justify-center mb-1">
+              <AlertTriangle className="h-4 w-4 text-red-500 mr-1" />
+              <span className="text-2xl font-bold text-red-600">{totalAnomalies}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Total Anomalies</p>
+          </div>
+          <div className="text-center p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center justify-center mb-1">
+              <TrendingUp className="h-4 w-4 text-blue-500 mr-1" />
+              <span className="text-2xl font-bold text-blue-600">{averageConfidence}%</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Avg Confidence</p>
+          </div>
+        </div>
+
+        {/* Status Badge */}
         {containerInfo && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">ID: {containerInfo.id}</span>
-            <Badge 
-              variant="outline" 
-              className={`${getStatusColor(containerInfo.status)} ring-1 ring-inset`}
-            >
+          <div className="flex items-center justify-between mb-4 p-2 bg-muted/20 rounded">
+            <span className="text-sm text-muted-foreground">Status:</span>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${getStatusColor(containerInfo.status)}`} />
               {containerInfo.status}
+            </Badge>
+          </div>
+        )}
+
+        {highConfidenceAnomalies > 0 && (
+          <div className="flex items-center justify-between text-sm p-2 bg-red-50 rounded">
+            <span className="text-muted-foreground">High confidence:</span>
+            <Badge variant="destructive" className="text-xs">
+              {highConfidenceAnomalies} / {totalAnomalies}
             </Badge>
           </div>
         )}
       </div>
 
-      {/* Summary Statistics */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Analysis Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-1">
-                <AlertTriangle className="h-4 w-4 text-red-500 mr-1" />
-                <span className="text-2xl font-bold text-red-600">{totalAnomalies}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Total Anomalies</p>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-1">
-                <TrendingUp className="h-4 w-4 text-blue-500 mr-1" />
-                <span className="text-2xl font-bold text-blue-600">{averageConfidence}%</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Avg Confidence</p>
-            </div>
-          </div>
-          
-          {highConfidenceAnomalies > 0 && (
-            <div className="mt-3 pt-3 border-t">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">High confidence:</span>
-                <Badge variant="destructive" className="text-xs">
-                  {highConfidenceAnomalies} / {totalAnomalies}
-                </Badge>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Detected Anomalies List */}
-      <Card className="flex-1">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Detected Anomalies</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-2 max-h-64 overflow-y-auto">
+      {/* Detected Anomalies */}
+      <div className="mb-6">
+        <h4 className="font-medium mb-3">Detected Anomalies</h4>
+        <div className="space-y-3">
           {anomalies.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <div className="text-center py-6 text-muted-foreground">
+              <AlertTriangle className="h-6 w-6 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No anomalies detected</p>
             </div>
           ) : (
             anomalies.map((anomaly) => (
               <div
                 key={anomaly.id}
-                className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 ${
-                  selectedAnomalyId === anomaly.id ? "ring-2 ring-blue-500 bg-blue-50" : ""
+                className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-sm ${
+                  selectedAnomalyId === anomaly.id ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-muted/20"
                 }`}
                 onClick={() => onAnomalySelect?.(anomaly)}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-medium text-sm">{anomaly.type}</p>
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <h5 className="font-medium text-sm mb-1">{anomaly.type}</h5>
                     {anomaly.zone && (
-                      <div className="flex items-center mt-1">
+                      <div className="flex items-center">
                         <MapPin className="h-3 w-3 text-muted-foreground mr-1" />
-                        <p className="text-xs text-muted-foreground">{anomaly.zone}</p>
+                        <span className="text-xs text-muted-foreground">{anomaly.zone}</span>
                       </div>
                     )}
                   </div>
                   <Badge 
                     variant={getConfidenceBadgeVariant(anomaly.confidence)}
-                    className="text-xs"
+                    className="text-xs font-medium"
                   >
                     {Math.round(anomaly.confidence * 100)}%
                   </Badge>
                 </div>
                 
-                <div className="text-xs text-muted-foreground">
-                  Position: {Math.round(anomaly.boundingBox.x)}%, {Math.round(anomaly.boundingBox.y)}%
+                <div className="text-xs text-muted-foreground bg-muted/20 p-2 rounded">
+                  <span className="font-medium">Position:</span> {Math.round(anomaly.boundingBox.x)}%, {Math.round(anomaly.boundingBox.y)}%
                 </div>
               </div>
             ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Display Controls */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Display Options</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
+      <div>
+        <h4 className="font-medium mb-3">Display Options</h4>
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Eye className="h-4 w-4 text-muted-foreground" />
@@ -179,7 +163,7 @@ export default function DetectionResultsPanel({
               variant={showBoundingBoxes ? "default" : "outline"}
               size="sm"
               onClick={() => onToggleBoundingBoxes(!showBoundingBoxes)}
-              className="h-7 px-2"
+              className="h-8 px-3"
             >
               {showBoundingBoxes ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
             </Button>
@@ -194,7 +178,7 @@ export default function DetectionResultsPanel({
               variant={showHeatmap ? "default" : "outline"}
               size="sm"
               onClick={() => onToggleHeatmap(!showHeatmap)}
-              className="h-7 px-2"
+              className="h-8 px-3"
             >
               {showHeatmap ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
             </Button>
@@ -209,18 +193,18 @@ export default function DetectionResultsPanel({
               variant={showConfidenceScores ? "default" : "outline"}
               size="sm"
               onClick={() => onToggleConfidenceScores(!showConfidenceScores)}
-              className="h-7 px-2"
+              className="h-8 px-3"
             >
               {showConfidenceScores ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Scan Information */}
       {containerInfo?.scanTime && (
-        <div className="text-xs text-muted-foreground text-center border-t pt-2">
-          Scanned: {containerInfo.scanTime}
+        <div className="mt-6 pt-4 border-t text-xs text-muted-foreground text-center">
+          Scanned: {new Date(containerInfo.scanTime).toLocaleString()}
         </div>
       )}
     </div>

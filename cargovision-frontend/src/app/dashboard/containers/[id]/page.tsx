@@ -93,7 +93,7 @@ export default function ContainerDetailPage() {
   };
 
   // Sample X-ray image URL (you can replace with actual X-ray images)
-  const sampleImageUrl = "https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?w=800&h=600&fit=crop&crop=center";
+  const sampleImageUrl = "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=600&fit=crop&crop=center";
 
   // Sample anomaly data
   const sampleAnomalies: AnomalyDetection[] = [
@@ -321,49 +321,58 @@ export default function ContainerDetailPage() {
       </div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-300px)]">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
         {/* X-ray Analysis */}
-        <div className="lg:col-span-2 bg-card rounded-lg border p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">X-ray Analysis</h2>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Scan Time:</span>
-              <span className="text-sm font-medium">
-                {new Date(containerInfo.scanTime).toLocaleString()}
-              </span>
-            </div>
-          </div>
-          
-          <div className="h-[calc(100%-60px)]">
-            <XRayImageViewer 
-              imageUrl={sampleImageUrl}
-              alt={`Container X-ray scan ${containerId}`}
-              onImageLoad={() => console.log("X-ray image loaded")}
-              anomalies={sampleAnomalies}
-              heatmapData={sampleHeatmapData}
-              showBoundingBoxes={showBoundingBoxes}
-              showHeatmap={showHeatmap}
-              showConfidenceScores={showConfidenceScores}
-              heatmapOpacity={heatmapOpacity}
-              onAnomalyClick={handleAnomalyClick}
-            />
-          </div>
+        <div className="xl:col-span-3">
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>X-ray Analysis</CardTitle>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Scan Time:</span>
+                  <span className="font-medium">
+                    {new Date(containerInfo.scanTime).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="aspect-[4/3] w-full">
+                <XRayImageViewer 
+                  imageUrl={sampleImageUrl}
+                  alt={`Container X-ray scan ${containerId}`}
+                  onImageLoad={() => console.log("X-ray image loaded")}
+                  anomalies={sampleAnomalies}
+                  heatmapData={sampleHeatmapData}
+                  showBoundingBoxes={showBoundingBoxes}
+                  showHeatmap={showHeatmap}
+                  showConfidenceScores={showConfidenceScores}
+                  heatmapOpacity={heatmapOpacity}
+                  onAnomalyClick={handleAnomalyClick}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Detection Results Panel */}
-        <div className="bg-card rounded-lg border p-4">
-          <DetectionResultsPanel
-            anomalies={sampleAnomalies}
-            containerInfo={containerInfo}
-            showBoundingBoxes={showBoundingBoxes}
-            showHeatmap={showHeatmap}
-            showConfidenceScores={showConfidenceScores}
-            onToggleBoundingBoxes={setShowBoundingBoxes}
-            onToggleHeatmap={setShowHeatmap}
-            onToggleConfidenceScores={setShowConfidenceScores}
-            onAnomalySelect={handleAnomalyClick}
-            selectedAnomalyId={selectedAnomalyId}
-          />
+        <div className="xl:col-span-1">
+          <Card className="h-full">
+            <CardContent className="p-0">
+              <DetectionResultsPanel
+                anomalies={sampleAnomalies}
+                containerInfo={containerInfo}
+                showBoundingBoxes={showBoundingBoxes}
+                showHeatmap={showHeatmap}
+                showConfidenceScores={showConfidenceScores}
+                onToggleBoundingBoxes={setShowBoundingBoxes}
+                onToggleHeatmap={setShowHeatmap}
+                onToggleConfidenceScores={setShowConfidenceScores}
+                onAnomalySelect={handleAnomalyClick}
+                selectedAnomalyId={selectedAnomalyId}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
 
