@@ -48,6 +48,7 @@ export default function VideoDemoSection() {
           muted
           loop
           playsInline
+          preload="auto"
           className="w-full h-full object-cover"
         >
           Your browser does not support the video tag.

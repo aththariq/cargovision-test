@@ -81,7 +81,7 @@ export default function HeroSection() {
           alt="Cargovision Hero Background"
           fill
           className="object-cover"
-          priority
+          loading="lazy"
         />
         <div className="absolute inset-0 bg-blue-900/40 backdrop-brightness-45" />
       </div>

@@ -62,7 +62,7 @@ export default function TestimonialsSection() {
   ];
 
   return (
-    <section className="py-24 bg-gradient-to-br from-gray-50 via-blue-50 to-white">
+    <section className="relative z-10 py-24 bg-gradient-to-br from-gray-50 via-blue-50 to-white">
       <div className="container mx-auto px-6">
         {/* Header */}
         <div className="max-w-4xl mx-auto text-center mb-16">
