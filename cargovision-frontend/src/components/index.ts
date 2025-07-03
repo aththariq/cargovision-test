@@ -12,4 +12,7 @@ export { default as CTASection } from './sections/cta-section';
 export { Button } from './ui/button';
 export { Badge } from './ui/badge';
 export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
-export { Separator } from './ui/separator'; 
+export { Separator } from './ui/separator';
+
+// Report Components
+export { default as PDFPreviewModal } from './reports/pdf-preview-modal'; 

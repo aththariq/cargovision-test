@@ -66,12 +66,17 @@ export interface User {
 
 export interface Container {
   id: string;
-  number: string;
-  status: 'pending' | 'inspecting' | 'completed' | 'failed';
+  containerId: string;
+  status: 'pending' | 'inspecting' | 'completed' | 'failed' | 'flagged' | 'clean' | 'in-progress';
   location: string;
-  inspectionDate: Date;
+  inspectionDate?: Date;
   inspector?: string;
   findings?: ContainerFinding[];
+  scanTime?: string;
+  vessel?: string;
+  origin?: string;
+  destination?: string;
+  weight?: string;
 }
 
 export interface ContainerFinding {
@@ -93,4 +98,44 @@ export interface InspectionReport {
   findings: ContainerFinding[];
   aiConfidenceScore: number;
   manualReview: boolean;
+}
+
+// Container List Table Types
+export interface ContainerTableRow {
+  id: string;
+  containerId: string;
+  status: 'flagged' | 'clean' | 'pending' | 'in-progress';
+  inspectionTime: string;
+  location: string;
+  inspector: string;
+  aiConfidence: number;
+  anomalyCount?: number;
+  priority?: 'high' | 'medium' | 'low';
+}
+
+export interface ContainerListFilters {
+  status?: 'all' | 'flagged' | 'clean' | 'pending' | 'in-progress';
+  search?: string;
+  location?: string;
+  inspector?: string;
+  dateRange?: {
+    from: Date;
+    to: Date;
+  };
+}
+
+// AI Detection Types (extended)
+export interface AIDetectionSummary {
+  totalAnomalies: number;
+  highRiskCount: number;
+  confidenceScore: number;
+  scanDuration: number;
+  processingComplete: boolean;
+}
+
+export interface InspectionHistoryEntry {
+  date: string;
+  inspector: string;
+  status: string;
+  anomalies: number;
 } 

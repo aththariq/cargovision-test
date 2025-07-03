@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import StagewiseToolbarClient from "@/components/common/stagewise-toolbar-client";
 import { AuthProvider } from "@/lib/auth-context";
+import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,6 +42,31 @@ export default function RootLayout({
         <AuthProvider>
           <StagewiseToolbarClient />
           {children}
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: 'hsl(var(--background))',
+                color: 'hsl(var(--foreground))',
+                border: '1px solid hsl(var(--border))',
+              },
+              success: {
+                style: {
+                  background: 'hsl(var(--background))',
+                  color: 'hsl(var(--foreground))',
+                  border: '1px solid hsl(142.1 76.2% 36.3%)',
+                },
+              },
+              error: {
+                style: {
+                  background: 'hsl(var(--background))',
+                  color: 'hsl(var(--foreground))',
+                  border: '1px solid hsl(var(--destructive))',
+                },
+              },
+            }}
+          />
         </AuthProvider>
       </body>
     </html>
