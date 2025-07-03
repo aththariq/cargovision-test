@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   Container, 
@@ -57,7 +58,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1">
-          <img src="/Icon.png" alt="CargoVision" className="h-8 w-8" />
+          <Image src="/Icon.png" alt="CargoVision" width={32} height={32} className="h-8 w-8" />
           <span className="text-xl font-semibold text-[#12295F]">CargoVision</span>
         </div>
       </SidebarHeader>

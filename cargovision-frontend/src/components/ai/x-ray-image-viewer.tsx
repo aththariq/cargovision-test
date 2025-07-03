@@ -192,6 +192,7 @@ export default function XRayImageViewer({
         onTouchEnd={handleTouchEnd}
       >
         {/* X-ray Image */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           ref={imageRef}
           src={imageUrl}
