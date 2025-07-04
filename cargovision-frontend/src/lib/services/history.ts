@@ -82,6 +82,11 @@ class HistoryService {
     return apiService.get<IllegalHistoryResponse>('/service/history/illegal');
   }
 
+  // Get illegal detection scan history for specific container
+  async getIllegalHistoryByContainer(containerID: string): Promise<ApiResponse<IllegalHistoryResponse>> {
+    return apiService.get<IllegalHistoryResponse>(`/service/history/illegal?containerID=${containerID}`);
+  }
+
   // Get categorization scan history
   async getCategoryHistory(): Promise<ApiResponse<CategoryHistoryResponse>> {
     return apiService.get<CategoryHistoryResponse>('/service/history/category');
