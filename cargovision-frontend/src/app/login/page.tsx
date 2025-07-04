@@ -66,16 +66,20 @@ export default function LoginPage() {
         throw new Error(err?.message || "Login failed");
       }
 
-      const data = await res.json();
-      
-      // Extract user data from response or use fallback
+      const resJson = await res.json();
+
+      const apiUserData = resJson.data || {};
+      const token = apiUserData.token || resJson.token || "";
+      const userEmail = apiUserData.email || resJson.email || email;
+
+      // Build user data object
       const userData = {
-        name: data.user?.name || data.name || email.split('@')[0], // Use email prefix if no name
-        email: data.user?.email || data.email || email
+        name: userEmail.split("@")[0],
+        email: userEmail,
       };
       
       // Persist token via context helper (handles cookie & localStorage)
-      signIn(data.token || "", userData, rememberMe);
+      signIn(token, userData, rememberMe);
 
       // Store or clear remembered credentials based on the checkbox
       if (rememberMe) {
