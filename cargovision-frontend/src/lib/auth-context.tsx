@@ -1,62 +1,118 @@
 "use client";
 
-import React from "react";
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authService, LoginCredentials, RegisterData, AuthResponse, ApiResponse } from '@/lib/api';
 
-interface AuthContextValue {
-  token: string | null;
-  isAuthenticated: boolean;
-  signIn: (token: string, remember?: boolean) => void;
-  signOut: () => void;
+interface User {
+  email: string;
+  token: string;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+interface AuthContextType {
+  user: User | null;
+  login: (credentials: LoginCredentials) => Promise<ApiResponse<AuthResponse>>;
+  register: (data: RegisterData) => Promise<ApiResponse<AuthResponse>>;
+  logout: () => void;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
-  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // On mount, pull token from localStorage if present
+  // Initialize auth state on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("token");
-      if (stored) {
-        setToken(stored);
+    const initializeAuth = async () => {
+      try {
+        const token = authService.getToken();
+        if (token) {
+          // Try to refresh token to validate it's still valid
+          try {
+            const refreshResponse = await authService.refreshToken();
+            if (refreshResponse.status === 'success') {
+              // Token is valid, set user state
+              // Note: We don't have email in stored token, so we'll need to decode it or store it separately
+              // For now, we'll just mark as authenticated
+              setUser({
+                email: 'user@example.com', // Would need to store this or decode from JWT
+                token: refreshResponse.data.token
+              });
+            }
+          } catch {
+            // Token is invalid, clear it
+            authService.logout();
+          }
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    initializeAuth();
   }, []);
 
-  const signIn = (newToken: string, remember = true) => {
-    setToken(newToken);
-    // Save to cookie for middleware
-    document.cookie = `token=${newToken}; path=/; sameSite=lax`;
-    if (remember) {
-      localStorage.setItem("token", newToken);
+  const login = async (credentials: LoginCredentials): Promise<ApiResponse<AuthResponse>> => {
+    setIsLoading(true);
+    try {
+      const response = await authService.login(credentials);
+      if (response.status === 'success') {
+        setUser({
+          email: response.data.email,
+          token: response.data.token
+        });
+      }
+      return response;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const signOut = () => {
-    setToken(null);
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-    localStorage.removeItem("token");
-    router.replace("/login");
+  const register = async (data: RegisterData): Promise<ApiResponse<AuthResponse>> => {
+    setIsLoading(true);
+    try {
+      const response = await authService.register(data);
+      if (response.status === 'success') {
+        setUser({
+          email: response.data.email,
+          token: response.data.token
+        });
+      }
+      return response;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const value: AuthContextValue = {
-    token,
-    isAuthenticated: Boolean(token),
-    signIn,
-    signOut,
+  const logout = () => {
+    authService.logout();
+    setUser(null);
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const value: AuthContextType = {
+    user,
+    login,
+    register,
+    logout,
+    isLoading,
+    isAuthenticated: !!user
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within AuthProvider");
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
-  return ctx;
+  return context;
 } 
