@@ -210,18 +210,18 @@ export default function ReportsPage() {
 
   const handleViewReport = (report: ReportListItem) => {
     // Convert ReportListItem to Container for PDF preview
+    // Map "in-progress" to "pending" for compatibility with Container type
+    const mappedStatus = report.status === 'in-progress' ? 'pending' : report.status as "flagged" | "clean" | "pending";
+    
     const container: Container = {
       id: report.id,
-      containerId: report.containerNumber,
-      status: report.status,
-      location: report.location,
-      inspectionDate: new Date(report.inspectionDate),
-      inspector: report.inspector,
-      scanTime: new Date(report.inspectionDate).toLocaleString(),
-      vessel: 'MSC Lorena', // Mock data
-      origin: 'Singapore',
-      destination: 'Jakarta',
-      weight: '28,500 kg'
+      containerID: report.containerNumber,
+      status: mappedStatus,
+      lastScan: new Date(report.inspectionDate).toISOString(),
+      // Additional properties that might be needed by Container type
+      totalScans: 1,
+      illegalDetections: report.anomalyCount,
+      categoryDetections: 0
     };
 
     setSelectedReport(container);

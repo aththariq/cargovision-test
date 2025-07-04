@@ -1,75 +1,18 @@
 import { apiService, ApiResponse } from './api';
+import { 
+  OcrHistoryResponse, 
+  IllegalHistoryResponse, 
+  CategoryHistoryResponse,
+  OcrScan,
+  IllegalScan, 
+  CategoryScan,
+  ContainerData,
+  DashboardStats,
+  RecentActivity,
+  ContainerTableRow 
+} from '@/types';
 
-// OCR History Types
-export interface OcrScan {
-  id: string;
-  scanImage: string;
-  visualizationImage: string;
-  createdTime: string;
-  detections?: Array<{
-    text: string;
-    confidence: number;
-    bbox: number[];
-  }>;
-}
 
-export interface OcrHistoryResponse {
-  ocrScans: OcrScan[];
-}
-
-// Illegal Detection History Types
-export interface IllegalScan {
-  id: string;
-  containerID?: string;
-  scanImage: string;
-  visualizationImage: string;
-  detections: number;
-  createdTime: string;
-  detectionDetails?: Array<{
-    label: string;
-    confidence: number;
-    bbox: number[];
-  }>;
-}
-
-export interface IllegalHistoryResponse {
-  illegalScans: IllegalScan[];
-}
-
-// Category History Types
-export interface CategoryScan {
-  id: string;
-  containerID?: string;
-  scanImage: string;
-  visualizationImage: string;
-  detections: number;
-  createdTime: string;
-  detectionDetails?: Array<{
-    category: string;
-    confidence: number;
-    bbox: number[];
-  }>;
-}
-
-export interface CategoryHistoryResponse {
-  categoryScans: CategoryScan[];
-}
-
-// Combined Container Data
-export interface ContainerData {
-  id: string;
-  containerID?: string;
-  status: 'flagged' | 'clean' | 'pending' | 'in-progress';
-  lastScanTime: string;
-  scanTypes: ('ocr' | 'illegal' | 'category')[];
-  illegalDetections?: number;
-  categoryDetections?: number;
-  confidence?: number;
-  images: {
-    scanImage?: string;
-    visualizationImage?: string;
-  };
-}
 
 class HistoryService {
   // Get OCR scan history
@@ -87,120 +30,176 @@ class HistoryService {
     return apiService.get<IllegalHistoryResponse>(`/service/history/illegal?containerID=${containerID}`);
   }
 
-  // Get categorization scan history
+  // Get category detection scan history
   async getCategoryHistory(): Promise<ApiResponse<CategoryHistoryResponse>> {
     return apiService.get<CategoryHistoryResponse>('/service/history/category');
   }
 
-  // Get combined container data for dashboard
+  // Get category detection scan history for specific container  
+  async getCategoryHistoryByContainer(containerID: string): Promise<ApiResponse<CategoryHistoryResponse>> {
+    return apiService.get<CategoryHistoryResponse>(`/service/history/category?containerID=${containerID}`);
+  }
+
+  // Get combined container data from illegal and category scans
   async getContainersData(): Promise<ContainerData[]> {
     try {
       const [illegalResponse, categoryResponse] = await Promise.all([
         this.getIllegalHistory(),
-        this.getCategoryHistory(),
+        this.getCategoryHistory()
       ]);
 
-      const containers = new Map<string, ContainerData>();
-
+      const containerMap = new Map<string, ContainerData>();
+      
       // Process illegal scans
-      illegalResponse.data.illegalScans.forEach(scan => {
-        const containerId = scan.containerID || scan.id;
-        const existing = containers.get(containerId) || {
-          id: containerId,
-          containerID: scan.containerID,
-          status: scan.detections > 0 ? 'flagged' : 'clean',
-          lastScanTime: scan.createdTime,
-          scanTypes: [],
-          images: {}
-        };
-
-        existing.scanTypes.push('illegal');
-        existing.illegalDetections = scan.detections;
-        existing.images.scanImage = scan.scanImage;
-        existing.images.visualizationImage = scan.visualizationImage;
+      illegalResponse.data.illegalScans.forEach((scan: IllegalScan) => {
+        if (!scan.containerID) return;
         
-        // Update status based on detections
-        if (scan.detections > 0) {
-          existing.status = 'flagged';
+        const existing = containerMap.get(scan.containerID);
+        if (existing) {
+          existing.illegalScans.push(scan);
+          existing.totalDetections += scan.detections.length;
+          if (scan.createdTime > existing.lastScanTime) {
+            existing.lastScanTime = scan.createdTime;
+          }
+        } else {
+          containerMap.set(scan.containerID, {
+            containerID: scan.containerID,
+            illegalScans: [scan],
+            categoryScans: [],
+            status: scan.detections.length > 0 ? 'flagged' : 'clean',
+            totalDetections: scan.detections.length,
+            lastScanTime: scan.createdTime,
+            scanTypes: ['illegal']
+          });
         }
-
-        // Update last scan time if this scan is more recent
-        if (new Date(scan.createdTime) > new Date(existing.lastScanTime)) {
-          existing.lastScanTime = scan.createdTime;
-        }
-
-        containers.set(containerId, existing);
       });
 
       // Process category scans
-      categoryResponse.data.categoryScans.forEach(scan => {
-        const containerId = scan.containerID || scan.id;
-        const existing = containers.get(containerId) || {
-          id: containerId,
-          containerID: scan.containerID,
-          status: 'clean',
-          lastScanTime: scan.createdTime,
-          scanTypes: [],
-          images: {}
-        };
-
-        existing.scanTypes.push('category');
-        existing.categoryDetections = scan.detections;
+      categoryResponse.data.categoryScans.forEach((scan: CategoryScan) => {
+        if (!scan.containerID) return;
         
-        // If no other images, use from category scan
-        if (!existing.images.scanImage) {
-          existing.images.scanImage = scan.scanImage;
-          existing.images.visualizationImage = scan.visualizationImage;
+        const existing = containerMap.get(scan.containerID);
+        if (existing) {
+          existing.categoryScans.push(scan);
+          existing.totalDetections += scan.detections.length;
+          if (scan.createdTime > existing.lastScanTime) {
+            existing.lastScanTime = scan.createdTime;
+          }
+          if (!existing.scanTypes.includes('category')) {
+            existing.scanTypes.push('category');
+          }
+        } else {
+          containerMap.set(scan.containerID, {
+            containerID: scan.containerID,
+            illegalScans: [],
+            categoryScans: [scan],
+            status: 'clean', // Category scans don't flag containers
+            totalDetections: scan.detections.length,
+            lastScanTime: scan.createdTime,
+            scanTypes: ['category']
+          });
         }
-
-        // Update last scan time if this scan is more recent
-        if (new Date(scan.createdTime) > new Date(existing.lastScanTime)) {
-          existing.lastScanTime = scan.createdTime;
-        }
-
-        containers.set(containerId, existing);
       });
 
-      return Array.from(containers.values()).sort(
-        (a, b) => new Date(b.lastScanTime).getTime() - new Date(a.lastScanTime).getTime()
-      );
+      // Update status based on illegal detections
+      containerMap.forEach((container) => {
+        const hasIllegalDetections = container.illegalScans.some(scan => scan.detections.length > 0);
+        container.status = hasIllegalDetections ? 'flagged' : 'clean';
+      });
 
+      return Array.from(containerMap.values());
     } catch (error) {
       console.error('Error fetching containers data:', error);
-      return [];
+      throw error;
     }
   }
 
   // Get dashboard statistics
-  async getDashboardStats() {
+  async getDashboardStats(): Promise<DashboardStats> {
     try {
       const containers = await this.getContainersData();
-      
-      const stats = {
-        totalContainers: containers.length,
-        flaggedContainers: containers.filter(c => c.status === 'flagged').length,
-        cleanContainers: containers.filter(c => c.status === 'clean').length,
-        pendingContainers: containers.filter(c => c.status === 'pending').length,
-        averageConfidence: 0,
-        totalDetections: containers.reduce((sum, c) => 
-          sum + (c.illegalDetections || 0) + (c.categoryDetections || 0), 0
-        ),
-        recentActivity: containers.slice(0, 10).map(container => ({
-          id: container.id,
-          containerId: container.containerID || container.id,
-          action: container.status === 'flagged' ? 'Flagged for review' : 'Scan completed',
-          timestamp: new Date(container.lastScanTime).toLocaleString(),
-          severity: container.status === 'flagged' ? 'high' : 'low',
-          confidence: container.confidence || 95
-        }))
-      };
+      const [illegalResponse, categoryResponse, ocrResponse] = await Promise.all([
+        this.getIllegalHistory(),
+        this.getCategoryHistory(), 
+        this.getOcrHistory()
+      ]);
 
-      return stats;
+      const totalContainers = containers.length;
+      const flaggedContainers = containers.filter(c => c.status === 'flagged').length;
+      
+      // Calculate total scans across all types
+      const totalScans = illegalResponse.data.illegalScans.length + 
+                        categoryResponse.data.categoryScans.length + 
+                        ocrResponse.data.ocrScans.length;
+
+      // Create recent activity from all scan types
+      const recentActivity: RecentActivity[] = [];
+      
+      // Add illegal scans to recent activity
+      illegalResponse.data.illegalScans.forEach((scan: IllegalScan) => {
+        recentActivity.push({
+          id: scan.id,
+          type: 'illegal',
+          containerID: scan.containerID || undefined,
+          timestamp: scan.createdTime,
+          status: scan.detections.length > 0 ? 'flagged' : 'clean',
+          detectionCount: scan.detections.length
+        });
+      });
+
+      // Add category scans to recent activity
+      categoryResponse.data.categoryScans.forEach((scan: CategoryScan) => {
+        recentActivity.push({
+          id: scan.id,
+          type: 'category',
+          containerID: scan.containerID || undefined,
+          timestamp: scan.createdTime,
+          status: 'clean', // Category scans don't flag
+          detectionCount: scan.detections.length
+        });
+      });
+
+      // Add OCR scans to recent activity  
+      ocrResponse.data.ocrScans.forEach((scan: OcrScan) => {
+        recentActivity.push({
+          id: scan.id,
+          type: 'ocr',
+          containerID: undefined, // OCR doesn't have containerID
+          timestamp: scan.createdTime,
+          status: 'clean', // OCR is informational
+          detectionCount: scan.detections.length
+        });
+      });
+
+      // Sort by timestamp (most recent first) and take top 10
+      recentActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      return {
+        totalContainers,
+        flaggedContainers,
+        totalScans,
+        recentActivity: recentActivity.slice(0, 10)
+      };
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       throw error;
     }
   }
+
+  // Convert container data to table rows
+  convertToTableRows(containers: ContainerData[]): ContainerTableRow[] {
+    return containers.map(container => ({
+      id: container.containerID,
+      containerID: container.containerID,
+      status: container.status,
+      lastScan: container.lastScanTime,
+      totalScans: container.illegalScans.length + container.categoryScans.length,
+      illegalDetections: container.illegalScans.reduce((sum, scan) => sum + scan.detections.length, 0),
+      categoryDetections: container.categoryScans.reduce((sum, scan) => sum + scan.detections.length, 0),
+      scanTypes: container.scanTypes
+    }));
+  }
 }
 
-export const historyService = new HistoryService(); 
+export const historyService = new HistoryService();
+export type { OcrScan, IllegalScan, CategoryScan, ContainerData }; 

@@ -67,27 +67,15 @@ export interface User {
 // Updated Container interface to match backend data
 export interface Container {
   id: string;
-  containerId?: string; // From backend containerID
-  status: 'pending' | 'inspecting' | 'completed' | 'failed' | 'flagged' | 'clean' | 'in-progress';
-  location?: string;
-  inspectionDate?: Date;
-  inspector?: string;
-  findings?: ContainerFinding[];
-  scanTime?: string;
-  lastScanTime?: string; // From backend createdTime
-  vessel?: string;
-  origin?: string;
-  destination?: string;
-  weight?: string;
-  // Backend specific fields
-  scanTypes?: ('ocr' | 'illegal' | 'category')[];
+  containerID: string;
+  status: "flagged" | "clean" | "pending";
+  lastScan: string;
+  flaggedItems?: number;
+  detections?: number;
+  scanType?: "ocr" | "illegal" | "category";
+  totalScans?: number;
   illegalDetections?: number;
   categoryDetections?: number;
-  confidence?: number;
-  images?: {
-    scanImage?: string;
-    visualizationImage?: string;
-  };
 }
 
 export interface ContainerFinding {
@@ -119,19 +107,13 @@ export interface InspectionReport {
 // Container List Table Types (Updated)
 export interface ContainerTableRow {
   id: string;
-  containerId: string;
-  status: 'flagged' | 'clean' | 'pending' | 'in-progress';
-  inspectionTime: string;
-  location: string;
-  inspector: string;
-  aiConfidence: number;
-  anomalyCount?: number;
-  priority?: 'high' | 'medium' | 'low';
-  // Backend specific fields
-  illegalDetections?: number;
-  categoryDetections?: number;
-  scanTypes?: string[];
-  lastScanTime?: string;
+  containerID: string;
+  status: "flagged" | "clean" | "pending";
+  lastScan: string;
+  totalScans: number;
+  illegalDetections: number;
+  categoryDetections: number;
+  scanTypes: string[];
 }
 
 export interface ContainerListFilters {
@@ -171,20 +153,17 @@ export interface InspectionHistoryEntry {
 export interface DashboardStats {
   totalContainers: number;
   flaggedContainers: number;
-  cleanContainers: number;
-  pendingContainers: number;
-  averageConfidence: number;
-  totalDetections: number;
+  totalScans: number;
   recentActivity: RecentActivity[];
 }
 
 export interface RecentActivity {
   id: string;
-  containerId: string;
-  action: string;
+  type: "illegal" | "category" | "ocr";
+  containerID?: string;
   timestamp: string;
-  severity: 'low' | 'medium' | 'high';
-  confidence: number;
+  status: "flagged" | "clean";
+  detectionCount: number;
 }
 
 // API Response Types
@@ -194,24 +173,74 @@ export interface ApiResponse<T> {
   data: T;
 }
 
-// Scan Detection Types
-export interface Detection {
-  id?: string;
+// Updated Detection Types for new API structure
+export interface OcrDetection {
+  class_name: string;
   confidence: number;
-  bbox: number[];
-  // For illegal detection
-  label?: string;
-  // For category detection  
-  category?: string;
-  // For OCR detection
-  text?: string;
+  ocr_text: string | null;
 }
 
-export interface ScanResult {
+export interface IllegalDetection {
+  class_name: string;
+  confidence: number;
+}
+
+export interface CategoryDetection {
+  class_name: string;
+  confidence: number;
+}
+
+// Updated Scan Types
+export interface OcrScan {
   id: string;
   scanImage: string;
   visualizationImage: string;
-  detections: Detection[];
-  createdTime?: string;
-  containerID?: string;
-} 
+  detections: OcrDetection[];
+  createdTime: string;
+}
+
+export interface IllegalScan {
+  id: string;
+  containerID?: string | null;
+  scanImage: string;
+  visualizationImage: string;
+  detections: IllegalDetection[];
+  createdTime: string;
+}
+
+export interface CategoryScan {
+  id: string;
+  containerID?: string | null;
+  scanImage: string;
+  visualizationImage: string;
+  detections: CategoryDetection[];
+  createdTime: string;
+}
+
+// API Response Types
+export interface OcrHistoryResponse {
+  ocrScans: OcrScan[];
+}
+
+export interface IllegalHistoryResponse {
+  illegalScans: IllegalScan[];
+}
+
+export interface CategoryHistoryResponse {
+  categoryScans: CategoryScan[];
+}
+
+// Container Data Types
+export interface ContainerData {
+  containerID: string;
+  illegalScans: IllegalScan[];
+  categoryScans: CategoryScan[];
+  status: "flagged" | "clean" | "pending";
+  totalDetections: number;
+  lastScanTime: string;
+  scanTypes: string[];
+}
+
+// Filter Types
+export type ScanTypeFilter = "all" | "ocr" | "illegal" | "category";
+export type StatusFilter = "all" | "flagged" | "clean" | "pending"; 

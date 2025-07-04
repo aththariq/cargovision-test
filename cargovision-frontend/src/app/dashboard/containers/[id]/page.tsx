@@ -35,7 +35,7 @@ export default function ContainerDetailPage() {
       
       if (response.status === 'success') {
         const scans = response.data.illegalScans;
-        const totalDetections = scans.reduce((sum, scan) => sum + scan.detections, 0);
+        const totalDetections = scans.reduce((sum, scan) => sum + scan.detections.length, 0);
         const status = totalDetections > 0 ? 'flagged' : 'clean';
         const lastScanTime = scans.length > 0 ? scans[0].createdTime : '';
 
@@ -213,7 +213,7 @@ export default function ContainerDetailPage() {
                   </div>
                   <div className="flex items-center justify-between text-sm text-gray-600">
                     <span>Scan ID: {selectedScan.id}</span>
-                    <span>Detections: {selectedScan.detections}</span>
+                    <span>Detections: {selectedScan.detections.length}</span>
                     <span>{formatDate(selectedScan.createdTime)}</span>
                   </div>
                 </div>
@@ -254,9 +254,9 @@ export default function ContainerDetailPage() {
                       <span className="font-medium text-sm">
                         Scan {scan.id.slice(-6)}
                       </span>
-                      {scan.detections > 0 ? (
+                      {scan.detections.length > 0 ? (
                         <Badge variant="destructive" className="text-xs">
-                          {scan.detections} detections
+                          {scan.detections.length} detections
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
