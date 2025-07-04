@@ -13,16 +13,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function DashboardHeader() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
 
   const handleLogout = () => {
     signOut();
   };
 
-  // Mock user data - in real app this would come from context/state
-  const user = {
-    name: "John Doe",
-    email: "john@example.com"
+  // Fallback user data if no user is logged in
+  const displayUser = user || {
+    name: "User",
+    email: "user@example.com"
   };
 
   return (
@@ -44,17 +44,17 @@ export default function DashboardHeader() {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-100 transition-colors">
               <div className="h-8 w-8 rounded-full bg-[#12295F] text-white flex items-center justify-center text-sm font-medium">
-                {user.name.split(' ').map(n => n[0]).join('')}
+                {displayUser.name.split(' ').map(n => n[0]).join('')}
               </div>
-              <span className="hidden md:block text-sm font-medium">{user.name}</span>
+              <span className="hidden md:block text-sm font-medium">{displayUser.name}</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user.name}</p>
+                <p className="text-sm font-medium leading-none">{displayUser.name}</p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {user.email}
+                  {displayUser.email}
                 </p>
               </div>
             </DropdownMenuLabel>

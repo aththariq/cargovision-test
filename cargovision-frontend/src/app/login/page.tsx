@@ -67,8 +67,15 @@ export default function LoginPage() {
       }
 
       const data = await res.json();
+      
+      // Extract user data from response or use fallback
+      const userData = {
+        name: data.user?.name || data.name || email.split('@')[0], // Use email prefix if no name
+        email: data.user?.email || data.email || email
+      };
+      
       // Persist token via context helper (handles cookie & localStorage)
-      signIn(data.token || "", rememberMe);
+      signIn(data.token || "", userData, rememberMe);
 
       // Store or clear remembered credentials based on the checkbox
       if (rememberMe) {
