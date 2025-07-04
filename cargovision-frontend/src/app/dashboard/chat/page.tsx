@@ -393,7 +393,6 @@ export default function ChatPage() {
                         <div className="mt-2 space-y-1">
                           {message.attachments.map((attachment, idx) => (
                             <div key={idx} className="flex items-center gap-2 text-xs">
-                              {/* eslint-disable-next-line jsx-a11y/alt-text */}
                               {attachment.type === 'image' && <Image className="h-3 w-3" />}
                               {attachment.type === 'document' && <FileText className="h-3 w-3" />}
                               {attachment.type === 'container' && <Container className="h-3 w-3" />}

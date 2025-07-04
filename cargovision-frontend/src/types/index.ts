@@ -64,28 +64,41 @@ export interface User {
   avatar?: string;
 }
 
+// Updated Container interface to match backend data
 export interface Container {
   id: string;
-  containerId: string;
+  containerId?: string; // From backend containerID
   status: 'pending' | 'inspecting' | 'completed' | 'failed' | 'flagged' | 'clean' | 'in-progress';
-  location: string;
+  location?: string;
   inspectionDate?: Date;
   inspector?: string;
   findings?: ContainerFinding[];
   scanTime?: string;
+  lastScanTime?: string; // From backend createdTime
   vessel?: string;
   origin?: string;
   destination?: string;
   weight?: string;
+  // Backend specific fields
+  scanTypes?: ('ocr' | 'illegal' | 'category')[];
+  illegalDetections?: number;
+  categoryDetections?: number;
+  confidence?: number;
+  images?: {
+    scanImage?: string;
+    visualizationImage?: string;
+  };
 }
 
 export interface ContainerFinding {
   id: string;
-  type: 'damage' | 'security' | 'compliance' | 'anomaly';
+  type: 'damage' | 'security' | 'compliance' | 'anomaly' | 'illegal' | 'category';
   severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
   images?: string[];
   resolvedAt?: Date;
+  confidence?: number;
+  bbox?: number[]; // Bounding box coordinates
 }
 
 export interface InspectionReport {
@@ -98,9 +111,12 @@ export interface InspectionReport {
   findings: ContainerFinding[];
   aiConfidenceScore: number;
   manualReview: boolean;
+  scanType?: 'ocr' | 'illegal' | 'category';
+  scanImage?: string;
+  visualizationImage?: string;
 }
 
-// Container List Table Types
+// Container List Table Types (Updated)
 export interface ContainerTableRow {
   id: string;
   containerId: string;
@@ -111,6 +127,11 @@ export interface ContainerTableRow {
   aiConfidence: number;
   anomalyCount?: number;
   priority?: 'high' | 'medium' | 'low';
+  // Backend specific fields
+  illegalDetections?: number;
+  categoryDetections?: number;
+  scanTypes?: string[];
+  lastScanTime?: string;
 }
 
 export interface ContainerListFilters {
@@ -122,15 +143,19 @@ export interface ContainerListFilters {
     from: Date;
     to: Date;
   };
+  scanType?: 'all' | 'ocr' | 'illegal' | 'category';
 }
 
-// AI Detection Types (extended)
+// AI Detection Types (Updated for backend compatibility)
 export interface AIDetectionSummary {
   totalAnomalies: number;
   highRiskCount: number;
   confidenceScore: number;
   scanDuration: number;
   processingComplete: boolean;
+  illegalDetections?: number;
+  categoryDetections?: number;
+  ocrDetections?: number;
 }
 
 export interface InspectionHistoryEntry {
@@ -138,4 +163,55 @@ export interface InspectionHistoryEntry {
   inspector: string;
   status: string;
   anomalies: number;
+  scanType?: string;
+  confidence?: number;
+}
+
+// Dashboard Statistics (New)
+export interface DashboardStats {
+  totalContainers: number;
+  flaggedContainers: number;
+  cleanContainers: number;
+  pendingContainers: number;
+  averageConfidence: number;
+  totalDetections: number;
+  recentActivity: RecentActivity[];
+}
+
+export interface RecentActivity {
+  id: string;
+  containerId: string;
+  action: string;
+  timestamp: string;
+  severity: 'low' | 'medium' | 'high';
+  confidence: number;
+}
+
+// API Response Types
+export interface ApiResponse<T> {
+  status: 'success' | 'error';
+  message: string;
+  data: T;
+}
+
+// Scan Detection Types
+export interface Detection {
+  id?: string;
+  confidence: number;
+  bbox: number[];
+  // For illegal detection
+  label?: string;
+  // For category detection  
+  category?: string;
+  // For OCR detection
+  text?: string;
+}
+
+export interface ScanResult {
+  id: string;
+  scanImage: string;
+  visualizationImage: string;
+  detections: Detection[];
+  createdTime?: string;
+  containerID?: string;
 } 

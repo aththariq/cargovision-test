@@ -1,387 +1,458 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Container, 
-  Eye, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
-  Search, 
-  Filter, 
-  Download,
-  RefreshCw,
-  Upload,
-  AlertCircle,
-  Info
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { DataTable } from '@/components/ui/data-table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { historyService, ContainerScanHistory } from '@/lib/api';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { DataTable, Column } from "@/components/ui/data-table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ContainerTableRow, ContainerListFilters } from "@/types";
+import { Search, Filter, Eye, Download, Loader2, FileText, RefreshCw } from "lucide-react";
+import { historyService, ContainerData } from "@/lib/services/history";
+import toast from "react-hot-toast";
 
-interface ContainerStats {
-  totalContainers: number;
-  flaggedContainers: number;
-  cleanContainers: number;
-  pendingContainers: number;
-  averageConfidence: number;
-  scansByType: {
-    illegal: number;
-    category: number;
-    ocr: number;
-  };
-  recentActivity: ContainerScanHistory[];
-}
-
-
+// Dynamically import PDFPreviewModal to avoid SSR issues with PDF libraries
+const PDFPreviewModal = dynamic(
+  () => import("@/components/reports/pdf-preview-modal"),
+  { 
+    ssr: false,
+    loading: () => <div>Loading PDF preview...</div>
+  }
+);
 
 export default function ContainersPage() {
-  const [containers, setContainers] = useState<ContainerScanHistory[]>([]);
-  const [stats, setStats] = useState<ContainerStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const router = useRouter();
+  const [filters, setFilters] = useState<ContainerListFilters>({
+    status: 'all',
+    search: '',
+    scanType: 'all'
+  });
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const [previewContainer, setPreviewContainer] = useState<ContainerTableRow | null>(null);
+  const [containerData, setContainerData] = useState<ContainerData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch container data
-  const fetchContainerData = async (showLoading = true) => {
+  // Fetch container data from backend
+  const fetchContainerData = async () => {
     try {
-      if (showLoading) {
-        setIsLoading(true);
-      } else {
-        setIsRefreshing(true);
-      }
-      setError(null);
-
-      const [containerHistory, containerStats] = await Promise.all([
-        historyService.getAllContainerHistory(),
-        historyService.getContainerStats()
-      ]);
-
-      setContainers(containerHistory);
-      setStats(containerStats);
-    } catch (err) {
-      console.error('Error fetching container data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load container data');
+      setRefreshing(true);
+      const data = await historyService.getContainersData();
+      setContainerData(data);
+    } catch (error) {
+      console.error('Error fetching container data:', error);
+      toast.error('Failed to fetch container data. Please try again.');
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Load data on component mount
   useEffect(() => {
     fetchContainerData();
   }, []);
 
-  // Filter containers based on search and status
-  const filteredContainers = containers.filter(container => {
-    const matchesSearch = container.containerID.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         container.scanType.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || container.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Convert backend data to table row format
+  const convertToTableData = (containers: ContainerData[]): ContainerTableRow[] => {
+    return containers.map(container => ({
+      id: container.id,
+      containerId: container.containerID || container.id,
+      status: container.status,
+      inspectionTime: container.lastScanTime,
+      location: "Auto-detected", // Would come from API in real implementation
+      inspector: "AI System", // Would come from API in real implementation
+      aiConfidence: container.confidence || 0.95,
+      anomalyCount: (container.illegalDetections || 0) + (container.categoryDetections || 0),
+      priority: container.status === 'flagged' ? 'high' : container.status === 'pending' ? 'medium' : 'low',
+      illegalDetections: container.illegalDetections,
+      categoryDetections: container.categoryDetections,
+      scanTypes: container.scanTypes,
+      lastScanTime: container.lastScanTime
+    }));
+  };
 
-  // Define table columns
-  const columns = [
+  // Handle PDF download for container
+  const handleDownloadReport = async (container: ContainerTableRow) => {
+    const toastId = toast.loading(
+      `Generating PDF report for ${container.containerId}... 0%`,
+      { duration: Infinity }
+    );
+
+    try {
+      setDownloadingIds(prev => new Set(prev).add(container.containerId));
+
+      // Dynamically import PDF service to avoid SSR issues
+      const { default: PDFService } = await import("@/lib/services/pdf-service");
+
+      // Find the original container data
+      const originalContainer = containerData.find(c => 
+        (c.containerID === container.containerId) || (c.id === container.containerId)
+      );
+
+      // Prepare report data from container information
+      const reportData = PDFService.prepareReportData(
+        {
+          id: container.id,
+          containerId: container.containerId,
+          status: container.status,
+          location: container.location,
+          inspector: container.inspector,
+          scanTime: container.inspectionTime,
+          vessel: "MSC Mediterranean", // Sample data - would come from API
+          origin: "Shanghai Port",      // Sample data - would come from API
+          destination: "Los Angeles",   // Sample data - would come from API
+          weight: "28,450 kg",          // Sample data - would come from API
+          ...(originalContainer?.images && { images: originalContainer.images })
+        },
+        [] // No anomalies for basic list download - could be enhanced
+      );
+
+      // Generate PDF with progress tracking
+      const blob = await PDFService.generateReportWithProgress(reportData, (progress) => {
+        toast.loading(
+          `Generating PDF report for ${container.containerId}... ${progress}%`,
+          { id: toastId }
+        );
+      });
+
+      // Download the blob
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `container-report-${container.containerId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(
+        `PDF report for ${container.containerId} downloaded successfully!`,
+        { id: toastId }
+      );
+    } catch (error) {
+      console.error('Error downloading PDF report:', error);
+      toast.error(
+        `Failed to generate PDF report for ${container.containerId}. Please try again.`,
+        { id: toastId }
+      );
+    } finally {
+      setDownloadingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(container.containerId);
+        return newSet;
+      });
+    }
+  };
+
+  const getStatusBadge = (status: ContainerTableRow['status']) => {
+    const variants = {
+      flagged: "destructive",
+      clean: "secondary", 
+      pending: "outline",
+      "in-progress": "default"
+    } as const;
+    
+    const labels = {
+      flagged: "Flagged",
+      clean: "Clean", 
+      pending: "Pending",
+      "in-progress": "In Progress"
+    };
+
+    return (
+      <Badge variant={variants[status]}>
+        {labels[status]}
+      </Badge>
+    );
+  };
+
+  const getConfidenceDisplay = (confidence: number) => {
+    if (confidence === 0) return "N/A";
+    const percentage = Math.round(confidence * 100);
+    const color = percentage >= 90 ? "text-green-600" : 
+                  percentage >= 70 ? "text-yellow-600" : "text-red-600";
+    return <span className={color}>{percentage}%</span>;
+  };
+
+  const getScanTypesBadges = (scanTypes?: string[]) => {
+    if (!scanTypes || scanTypes.length === 0) return "None";
+    
+    return (
+      <div className="flex gap-1 flex-wrap">
+        {scanTypes.map(type => (
+          <Badge key={type} variant="outline" className="text-xs">
+            {type.toUpperCase()}
+          </Badge>
+        ))}
+      </div>
+    );
+  };
+
+  const columns: Column<ContainerTableRow>[] = [
     {
-      key: 'containerID',
-      header: 'Container ID',
-      accessor: (row: ContainerScanHistory) => (
-        <div className="font-medium">{row.containerID}</div>
-      ),
+      key: "containerId",
+      header: "Container ID",
+      className: "font-mono"
     },
     {
-      key: 'scanType',
-      header: 'Scan Type',
-      accessor: (row: ContainerScanHistory) => (
-        <Badge variant="secondary" className="capitalize">
-          {row.scanType}
-        </Badge>
-      ),
+      key: "status", 
+      header: "Status",
+      accessor: (row) => getStatusBadge(row.status)
     },
     {
-      key: 'status',
-      header: 'Status',
-      accessor: (row: ContainerScanHistory) => {
-        const status = row.status;
-        const variant = status === 'flagged' ? 'destructive' : 
-                       status === 'clean' ? 'default' : 'secondary';
-        const icon = status === 'flagged' ? AlertTriangle : 
-                    status === 'clean' ? CheckCircle : Clock;
-        const Icon = icon;
+      key: "scanTypes",
+      header: "Scan Types",
+      accessor: (row) => getScanTypesBadges(row.scanTypes)
+    },
+    {
+      key: "inspectionTime",
+      header: "Last Scan",
+      accessor: (row) => new Date(row.inspectionTime).toLocaleString()
+    },
+    {
+      key: "aiConfidence",
+      header: "AI Confidence", 
+      accessor: (row) => getConfidenceDisplay(row.aiConfidence)
+    },
+    {
+      key: "anomalyCount",
+      header: "Detections",
+      accessor: (row) => {
+        const illegal = row.illegalDetections || 0;
+        const category = row.categoryDetections || 0;
+        const total = illegal + category;
+        
+        if (total === 0) return "0";
         
         return (
-          <Badge variant={variant} className="flex items-center gap-1">
-            <Icon className="h-3 w-3" />
-            {status}
-          </Badge>
+          <div className="space-y-1">
+            <div className="text-sm font-medium">{total}</div>
+            {illegal > 0 && <div className="text-xs text-red-600">Illegal: {illegal}</div>}
+            {category > 0 && <div className="text-xs text-blue-600">Category: {category}</div>}
+          </div>
         );
-      },
+      }
     },
     {
-      key: 'confidence',
-      header: 'Confidence',
-      accessor: (row: ContainerScanHistory) => (
-        <div className="text-sm font-medium">
-          {row.confidence}%
-        </div>
-      ),
-    },
-    {
-      key: 'detections',
-      header: 'Detections',
-      accessor: (row: ContainerScanHistory) => (
-        <div className="text-sm">{row.detections}</div>
-      ),
-    },
-    {
-      key: 'createdTime',
-      header: 'Last Scan',
-      accessor: (row: ContainerScanHistory) => (
-        <div className="text-sm text-gray-500">
-          {new Date(row.createdTime).toLocaleString()}
-        </div>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      accessor: (row: ContainerScanHistory) => (
+      key: "actions",
+      header: "Actions",
+      accessor: (row) => (
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleViewDetails(row)}
-            className="h-8 px-2"
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/dashboard/containers/${row.containerId}`);
+            }}
           >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDownloadReport(row)}
-            className="h-8 px-2"
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewContainer(row);
+            }}
           >
-            <Download className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
+          </Button>
+          <Button 
+            size="sm" 
+            variant="outline"
+            disabled={downloadingIds.has(row.containerId)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDownloadReport(row);
+            }}
+          >
+            {downloadingIds.has(row.containerId) ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
           </Button>
         </div>
-      ),
-    },
+      )
+    }
   ];
 
-  // Handle view details
-  const handleViewDetails = (container: ContainerScanHistory) => {
-    // Open modal or navigate to details page
-    console.log('View details for:', container);
+  const tableData = convertToTableData(containerData);
+  
+  const filteredData = tableData.filter(container => {
+    if (filters.status && filters.status !== 'all' && container.status !== filters.status) {
+      return false;
+    }
+    if (filters.search && !container.containerId.toLowerCase().includes(filters.search.toLowerCase())) {
+      return false;
+    }
+    if (filters.scanType && filters.scanType !== 'all') {
+      if (!container.scanTypes?.includes(filters.scanType)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const handleRowClick = (container: ContainerTableRow) => {
+    router.push(`/dashboard/containers/${container.containerId}`);
   };
 
-  // Handle download report
-  const handleDownloadReport = (container: ContainerScanHistory) => {
-    // Generate and download report
-    console.log('Download report for:', container);
-  };
-
-  // Handle refresh
   const handleRefresh = () => {
-    fetchContainerData(false);
+    fetchContainerData();
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-10 w-32" />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Container Monitoring</h1>
+            <p className="text-muted-foreground">
+              Real-time container inspection tracking and management
+            </p>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-6 w-24 mb-2" />
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading container data...</span>
         </div>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-64 w-full" />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 text-red-600 mb-4">
-              <AlertCircle className="h-5 w-5" />
-              <span className="font-medium">Error Loading Container Data</span>
-            </div>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={() => fetchContainerData()} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Container Management</h1>
-          <p className="text-gray-600">Monitor and manage container scans</p>
+          <h1 className="text-3xl font-bold tracking-tight">Container Monitoring</h1>
+          <p className="text-muted-foreground">
+            Real-time container inspection tracking and management
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
+        <div className="flex gap-2">
+          <Button 
             variant="outline"
             onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="gap-2"
+            disabled={refreshing}
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
-          <Button className="gap-2">
-            <Upload className="h-4 w-4" />
-            New Scan
+          <Button>
+            <Filter className="mr-2 h-4 w-4" />
+            Export Report
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <Container className="h-5 w-5 text-blue-600" />
-              <span className="text-sm font-medium text-gray-600">Total Containers</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">
-              {stats?.totalContainers || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              <span className="text-sm font-medium text-gray-600">Flagged</span>
-            </div>
-            <div className="text-2xl font-bold text-red-600">
-              {stats?.flaggedContainers || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <span className="text-sm font-medium text-gray-600">Clean</span>
-            </div>
-            <div className="text-2xl font-bold text-green-600">
-              {stats?.cleanContainers || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-5 w-5 text-yellow-600" />
-              <span className="text-sm font-medium text-gray-600">Pending</span>
-            </div>
-            <div className="text-2xl font-bold text-yellow-600">
-              {stats?.pendingContainers || 0}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Filters */}
+      <div className="flex items-center gap-4 p-4 bg-card rounded-lg border">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by Container ID..."
+              value={filters.search || ''}
+              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+              className="pl-10"
+            />
+          </div>
+        </div>
+        <select
+          value={filters.status || 'all'}
+          onChange={(e) => setFilters(prev => ({ 
+            ...prev, 
+            status: e.target.value as ContainerListFilters['status'] 
+          }))}
+          className="px-3 py-2 border border-input rounded-md bg-background"
+        >
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="in-progress">In Progress</option>
+          <option value="clean">Clean</option>
+          <option value="flagged">Flagged</option>
+        </select>
+        <select
+          value={filters.scanType || 'all'}
+          onChange={(e) => setFilters(prev => ({ 
+            ...prev, 
+            scanType: e.target.value as ContainerListFilters['scanType'] 
+          }))}
+          className="px-3 py-2 border border-input rounded-md bg-background"
+        >
+          <option value="all">All Scan Types</option>
+          <option value="illegal">Illegal Detection</option>
+          <option value="category">Categorization</option>
+          <option value="ocr">OCR Analysis</option>
+        </select>
       </div>
 
-      {/* Filters and Search */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Container Scans</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search containers..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Filter className="h-4 w-4" />
-                    Status: {statusFilter === 'all' ? 'All' : statusFilter}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => setStatusFilter('all')}>
-                    All Status
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setStatusFilter('flagged')}>
-                    Flagged
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setStatusFilter('clean')}>
-                    Clean
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setStatusFilter('pending')}>
-                    Pending
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-card p-4 rounded-lg border">
+          <div className="text-2xl font-bold text-green-600">
+            {tableData.filter(c => c.status === 'clean').length}
           </div>
-        </CardHeader>
-        <CardContent>
-          {filteredContainers.length === 0 ? (
-            <div className="text-center py-12">
-              <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No containers found</h3>
-              <p className="text-gray-600">
-                {searchTerm || statusFilter !== 'all' 
-                  ? 'Try adjusting your search or filter criteria.'
-                  : 'Start by uploading container images for scanning.'}
-              </p>
-            </div>
-          ) : (
-            <DataTable
-              data={filteredContainers}
-              columns={columns}
-            />
-          )}
-        </CardContent>
-      </Card>
+          <div className="text-sm text-muted-foreground">Clean Containers</div>
+        </div>
+        <div className="bg-card p-4 rounded-lg border">
+          <div className="text-2xl font-bold text-red-600">
+            {tableData.filter(c => c.status === 'flagged').length}
+          </div>
+          <div className="text-sm text-muted-foreground">Flagged Containers</div>
+        </div>
+        <div className="bg-card p-4 rounded-lg border">
+          <div className="text-2xl font-bold text-yellow-600">
+            {tableData.filter(c => c.status === 'pending').length}
+          </div>
+          <div className="text-sm text-muted-foreground">Pending Inspection</div>
+        </div>
+        <div className="bg-card p-4 rounded-lg border">
+          <div className="text-2xl font-bold text-blue-600">
+            {tableData.filter(c => c.status === 'in-progress').length}
+          </div>
+          <div className="text-sm text-muted-foreground">In Progress</div>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="bg-card rounded-lg border p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Container List</h2>
+          <div className="text-sm text-muted-foreground">
+            Showing {filteredData.length} of {tableData.length} containers
+          </div>
+        </div>
+        
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          onRowClick={handleRowClick}
+        />
+      </div>
+
+      {/* PDF Preview Modal */}
+      {previewContainer && (
+        <PDFPreviewModal 
+          container={{
+            id: previewContainer.id,
+            containerId: previewContainer.containerId,
+            status: previewContainer.status,
+            location: previewContainer.location,
+            inspector: previewContainer.inspector,
+            scanTime: previewContainer.inspectionTime,
+            vessel: "MSC Mediterranean", // Sample data - would come from API
+            origin: "Shanghai Port",      // Sample data - would come from API
+            destination: "Los Angeles",   // Sample data - would come from API
+            weight: "28,450 kg"          // Sample data - would come from API
+          }}
+          anomalies={[]} // No anomalies for basic preview - could be enhanced
+          onClose={() => setPreviewContainer(null)}
+        />
+      )}
     </div>
   );
 } 

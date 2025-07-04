@@ -13,10 +13,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function DashboardHeader() {
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
 
   const handleLogout = () => {
-    logout();
+    signOut();
   };
 
   // Mock user data - in real app this would come from context/state

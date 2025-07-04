@@ -122,7 +122,14 @@ const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({
         // Dynamically import PDF service to avoid SSR issues
         const { default: PDFService } = await import('@/lib/services/pdf-service');
 
-        const reportData = PDFService.prepareReportData(container, anomalies, history);
+        const reportData = PDFService.prepareReportData(
+          {
+            ...container,
+            location: container.location || 'Unknown Location'
+          }, 
+          anomalies, 
+          history
+        );
         const blob = await PDFService.generatePDFBlob(reportData);
         
         setPdfBlob(blob);
